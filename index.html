@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Code-barre Caisse</title>
+<meta name="theme-color" content="#0b6b5c">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  /* Une colonne de caisse : scan, saisie, puis le code-barre sur fond blanc. */
+  :root {
+    color-scheme: light;
+    --bg: #f3f5f4;
+    --surface: #ffffff;
+    --fg: #14211e;
+    --muted: #5b6b66;
+    --line: #d5dcd9;
+    --accent: #0b6b5c;
+    --accent-fg: #ffffff;
+    --err: #b3261e;
+    --ok: #1d7a46;
+    --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #101513; --surface: #1a211f; --fg: #e6edea; --muted: #97a6a0; --line: #2f3a37;
+      --accent: #4cc9b0; --accent-fg: #07201a; --err: #ff9a8f; --ok: #6fd69a;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.45;
+    padding-top: max(16px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(28px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  main { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 1.3rem; font-weight: 700; margin: 0; }
+
+  label.cap { display: block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .field { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1; min-width: 0;
+    font-family: var(--font-mono); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.06em;
+    padding: 12px 14px; border-radius: 8px; border: 2px solid var(--line);
+    background: var(--surface); color: var(--fg);
+  }
+  input[type="text"]:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  button {
+    font: inherit; font-weight: 700; cursor: pointer;
+    padding: 0 16px; min-height: 52px; border-radius: 8px;
+    border: 2px solid var(--line); background: var(--surface); color: var(--fg);
+  }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button.big { width: 100%; min-height: 60px; font-size: 1.15rem; }
+  button:disabled { opacity: 0.55; cursor: default; }
+
+  .status { min-height: 1.5em; margin: 8px 0 0; font-size: 0.95rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .status.err { color: var(--err); }
+  .status.ok { color: var(--ok); }
+  .status button { min-height: 36px; padding: 0 12px; font-size: 0.9rem; }
+
+  /* Zone de scan */
+  .scan { display: flex; flex-direction: column; gap: 10px; }
+  .viewfinder { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 10px; overflow: hidden; }
+  .viewfinder video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .guide {
+    position: absolute; left: 4%; width: 92%; top: 35%; height: 30%;
+    border: 3px solid #ffffff; border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  }
+  .scan-msg { margin: 0; font-size: 0.95rem; color: var(--muted); min-height: 1.4em; }
+  .scan-actions { display: flex; gap: 8px; }
+  .scan-actions button { flex: 1; }
+
+  /* Le code-barre reste noir sur blanc dans les deux thèmes : un lecteur ne lit que des barres sombres sur fond clair. */
+  .ticket { background: #ffffff; color: #000000; border-radius: 8px; border: 1px solid var(--line); padding: 14px 10px 10px; }
+  .ticket svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  .ticket .empty { margin: 0; padding: 40px 12px; text-align: center; color: #555; font-size: 0.95rem; }
+  .ticket-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 0.8rem; color: #444; font-family: var(--font-mono); }
+
+  .tip { color: var(--muted); font-size: 0.9rem; margin: 0; }
+  .recent h2 { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font-family: var(--font-mono); font-weight: 600; font-size: 0.95rem; min-height: 40px; padding: 0 12px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Code-barre Caisse</h1>
+
+  <section class="scan">
+    <button id="scanBtn" class="primary big" type="button">Scanner les chiffres</button>
+    <div id="scanPanel" hidden>
+      <div class="viewfinder">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="guide"></div>
+      </div>
+      <p id="scanMsg" class="scan-msg" role="status" aria-live="polite"></p>
+      <div class="scan-actions">
+        <button id="stopBtn" type="button">Arrêter</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <label class="cap" for="ean">Numéro EAN (13 chiffres, ou 8)</label>
+    <div class="field">
+      <input id="ean" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="20" aria-describedby="status">
+      <button id="clear" type="button" aria-label="Effacer le numéro">Effacer</button>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section aria-label="Code-barre">
+    <div class="ticket" id="ticket"></div>
+  </section>
+
+  <p class="tip">Dernier chiffre manquant ? Tapez seulement les 12 premiers, il est calculé tout seul. Pour scanner depuis l'écran : luminosité au maximum, et une douchette à caméra (les lasers ne lisent pas les écrans).</p>
+
+  <section class="recent" id="recent" hidden>
+    <h2>Derniers codes</h2>
+    <div class="chips" id="chips"></div>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- Encodage EAN-13 / EAN-8 ---------- */
+  var L = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
+  var G = ["0100111","0110011","0011011","0100001","0011101","0111001","0000101","0010001","0001001","0010111"];
+  var R = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
+  var PARITY = ["LLLLLL","LLGLGG","LLGGLG","LLGGGL","LGLLGG","LGGLLG","LGGGLL","LGLGLG","LGLGGL","LGGLGL"];
+
+  function checkDigit(data) {
+    var s = 0;
+    for (var i = 0; i < data.length; i++) {
+      var d = +data.charAt(data.length - 1 - i);
+      s += d * (i % 2 === 0 ? 3 : 1);
+    }
+    return (10 - (s % 10)) % 10;
+  }
+  function isValidEan(code) {
+    return (code.length === 13 || code.length === 8) && checkDigit(code.slice(0, -1)) === +code.charAt(code.length - 1);
+  }
+
+  function encode(code) {
+    var bits, guards, quietL, dl, dr, firstDigitX = null;
+    if (code.length === 13) {
+      var p = PARITY[+code.charAt(0)];
+      var left = "", right = "", i;
+      for (i = 0; i < 6; i++) { var d = +code.charAt(i + 1); left += p.charAt(i) === "L" ? L[d] : G[d]; }
+      for (i = 7; i < 13; i++) right += R[+code.charAt(i)];
+      bits = "101" + left + "01010" + right + "101";
+      guards = [[0, 2], [45, 49], [92, 94]];
+      quietL = 11; firstDigitX = 5; dl = quietL + 3; dr = quietL + 3 + 42 + 5;
+    } else {
+      var l8 = "", r8 = "", a;
+      for (a = 0; a < 4; a++) l8 += L[+code.charAt(a)];
+      for (a = 4; a < 8; a++) r8 += R[+code.charAt(a)];
+      bits = "101" + l8 + "01010" + r8 + "101";
+      guards = [[0, 2], [31, 35], [64, 66]];
+      quietL = 7; dl = quietL + 3; dr = quietL + 3 + 28 + 5;
+    }
+    return { bits: bits, guards: guards, quietL: quietL, firstDigitX: firstDigitX, dl: dl, dr: dr };
+  }
+
+  function isGuard(idx, guards) {
+    for (var g = 0; g < guards.length; g++) if (idx >= guards[g][0] && idx <= guards[g][1]) return true;
+    return false;
+  }
+
+  function svgFor(code) {
+    var e = encode(code);
+    var width = e.quietL + e.bits.length + 7;
+    var parts = [];
+    var i = 0;
+    while (i < e.bits.length) {
+      if (e.bits.charAt(i) === "1") {
+        var tall = isGuard(i, e.guards);
+        var j = i;
+        while (j + 1 < e.bits.length && e.bits.charAt(j + 1) === "1" && isGuard(j + 1, e.guards) === tall) j++;
+        parts.push('<rect x="' + (e.quietL + i) + '" y="0" width="' + (j - i + 1) + '" height="' + (tall ? 64 : 58) + '" fill="#000"/>');
+        i = j + 1;
+      } else i++;
+    }
+    function t(x, ch) {
+      return '<text x="' + x + '" y="71" text-anchor="middle" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="9.5" font-weight="700" fill="#000">' + ch + '</text>';
+    }
+    var text = [];
+    var half = code.length === 13 ? 6 : 4;
+    var offset = code.length === 13 ? 1 : 0;
+    if (e.firstDigitX !== null) text.push(t(e.firstDigitX, code.charAt(0)));
+    for (var k = 0; k < half; k++) text.push(t(e.dl + 7 * k + 3.5, code.charAt(offset + k)));
+    for (var m = 0; m < half; m++) text.push(t(e.dr + 7 * m + 3.5, code.charAt(offset + half + m)));
+    return '<svg viewBox="0 0 ' + width + ' 74" role="img" aria-label="Code-barre ' + code + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect width="' + width + '" height="74" fill="#fff"/>' + parts.join("") + text.join("") + '</svg>';
+  }
+
+  /* ---------- Interface : saisie, statut, affichage ---------- */
+  var input = document.getElementById("ean");
+  var statusEl = document.getElementById("status");
+  var ticket = document.getElementById("ticket");
+  var recentBox = document.getElementById("recent");
+  var chips = document.getElementById("chips");
+  var KEY = "codes-recents";
+
+  function setStatus(msg, kind, fixedCode) {
+    statusEl.className = "status" + (kind ? " " + kind : "");
+    statusEl.textContent = msg;
+    if (fixedCode) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = "Corriger en " + fixedCode;
+      b.addEventListener("click", function () { input.value = fixedCode; update(true); });
+      statusEl.appendChild(b);
+    }
+  }
+  function showEmpty(msg) { ticket.innerHTML = '<p class="empty">' + msg + '</p>'; }
+
+  function draw(code, save) {
+    ticket.innerHTML = svgFor(code) +
+      '<div class="ticket-foot"><span>' + (code.length === 13 ? "EAN-13" : "EAN-8") + '</span><span>' + code + '</span></div>';
+    if (save) remember(code);
+  }
+
+  function update(save) {
+    var digits = input.value.replace(/\D/g, "");
+    if (digits !== input.value) input.value = digits;
+    var len = digits.length;
+    if (len === 0) { setStatus("", ""); showEmpty("Le code-barre apparaît ici."); return; }
+    if (len === 12 || len === 7) {
+      var full = digits + checkDigit(digits);
+      setStatus("Dernier chiffre calculé : " + full.charAt(full.length - 1), "ok");
+      draw(full, save); return;
+    }
+    if (len === 13 || len === 8) {
+      var expected = checkDigit(digits.slice(0, -1));
+      if (expected !== +digits.charAt(len - 1)) {
+        setStatus("Un chiffre est faux : le dernier devrait être " + expected + ".", "err", digits.slice(0, -1) + expected);
+        showEmpty("Vérifiez le numéro, un chiffre ne correspond pas.");
+        return;
+      }
+      setStatus("Numéro valide.", "ok");
+      draw(digits, save); return;
+    }
+    if (len > 13) { setStatus("Trop de chiffres : un EAN en compte 13 ou 8.", "err"); showEmpty("Trop de chiffres."); return; }
+    setStatus(len + " chiffre" + (len > 1 ? "s" : "") + ". Il en faut 13, ou 8 pour un petit format.", "");
+    showEmpty("Le code-barre apparaît ici.");
+  }
+
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
+  function remember(code) {
+    var list = load().filter(function (c) { return c !== code; });
+    list.unshift(code);
+    list = list.slice(0, 8);
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {}
+    renderRecent(list);
+  }
+  function renderRecent(list) {
+    chips.innerHTML = "";
+    if (!list.length) { recentBox.hidden = true; return; }
+    recentBox.hidden = false;
+    list.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = c;
+      b.addEventListener("click", function () { input.value = c; update(false); window.scrollTo(0, 0); });
+      chips.appendChild(b);
+    });
+  }
+
+  var timer = null;
+  input.addEventListener("input", function () {
+    update(false);
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var d = input.value.replace(/\D/g, "");
+      if (d.length === 13 || d.length === 8 || d.length === 12 || d.length === 7) update(true);
+    }, 1200);
+  });
+  document.getElementById("clear").addEventListener("click", function () {
+    input.value = ""; update(false); input.focus();
+  });
+
+  /* ---------- Scan des chiffres par la caméra ---------- */
+  var scanBtn = document.getElementById("scanBtn");
+  var scanPanel = document.getElementById("scanPanel");
+  var stopBtn = document.getElementById("stopBtn");
+  var video = document.getElementById("video");
+  var scanMsg = document.getElementById("scanMsg");
+  var TESS_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+
+  var stream = null, scanning = false, worker = null, tessLoading = null, detector = null;
+  var lastValid = null, attempt = 0, startedAt = 0;
+  var work = document.createElement("canvas");
+
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve();
+    if (tessLoading) return tessLoading;
+    tessLoading = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = TESS_SRC;
+      s.onload = resolve;
+      s.onerror = function () { tessLoading = null; reject(new Error("tesseract")); };
+      document.head.appendChild(s);
+    });
+    return tessLoading;
+  }
+
+  function getWorker() {
+    if (worker) return Promise.resolve(worker);
+    return loadTesseract().then(function () {
+      return window.Tesseract.createWorker("eng");
+    }).then(function (w) {
+      return w.setParameters({ tessedit_char_whitelist: "0123456789 ", tessedit_pageseg_mode: "7" }).then(function () {
+        worker = w; return w;
+      });
+    });
+  }
+
+  function say(msg) { scanMsg.textContent = msg; }
+
+  function stopScan() {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+    video.srcObject = null;
+    scanPanel.hidden = true;
+    scanBtn.hidden = false;
+  }
+
+  // Zone visible de la vidéo (l'image est recadrée dans le cadre 4:3) puis bande de lecture.
+  function bandRect() {
+    var vw = video.videoWidth, vh = video.videoHeight;
+    var ba = 4 / 3, va = vw / vh, vx, vy, w, h;
+    if (va < ba) { w = vw; h = vw / ba; vx = 0; vy = (vh - h) / 2; }
+    else { h = vh; w = vh * ba; vx = (vw - w) / 2; vy = 0; }
+    return { vx: vx, vy: vy, vw: w, vh: h, x: vx + 0.04 * w, y: vy + 0.35 * h, w: 0.92 * w, h: 0.30 * h };
+  }
+
+  function grabBand(variant) {
+    var r = bandRect();
+    var outW = 1100, outH = Math.round(outW * r.h / r.w);
+    work.width = outW; work.height = outH;
+    var ctx = work.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, outW, outH);
+    var img = ctx.getImageData(0, 0, outW, outH), d = img.data, n = outW * outH;
+    var hist = new Array(256).fill(0), i;
+    for (i = 0; i < n; i++) {
+      var g = (d[4 * i] * 299 + d[4 * i + 1] * 587 + d[4 * i + 2] * 114) / 1000 | 0;
+      d[4 * i] = g; hist[g]++;
+    }
+    var lo = 0, hi = 255, acc = 0;
+    for (i = 0; i < 256; i++) { acc += hist[i]; if (acc > n * 0.02) { lo = i; break; } }
+    acc = 0;
+    for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc > n * 0.02) { hi = i; break; } }
+    if (hi - lo < 20) { hi = lo + 20; }
+    for (i = 0; i < n; i++) {
+      var v = (d[4 * i] - lo) * 255 / (hi - lo);
+      v = v < 0 ? 0 : v > 255 ? 255 : v;
+      if (variant === 1) v = v > 128 ? 255 : 0;
+      d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = v; d[4 * i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return work;
+  }
+
+  function accept(code) {
+    stopScan();
+    input.value = code;
+    update(true);
+    try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+
+  function candidates(text) {
+    var out = [];
+    var lines = text.split(/\n+/);
+    lines.forEach(function (line) {
+      var d = line.replace(/\D/g, "");
+      if (d.length === 13 || d.length === 8) out.push(d);
+    });
+    var all = text.replace(/\D/g, "");
+    if ((all.length === 13 || all.length === 8) && out.indexOf(all) < 0) out.push(all);
+    return out;
+  }
+
+  function loop() {
+    if (!scanning) return;
+    if (Date.now() - startedAt > 90000) { stopScan(); setStatus("Pas de numéro lu. Rapprochez-vous, ajoutez de la lumière ou tapez-le à la main.", "err"); return; }
+    if (!video.videoWidth) { setTimeout(loop, 200); return; }
+    attempt++;
+
+    var pre = Promise.resolve(null);
+    if (detector) {
+      pre = detector.detect(video).then(function (codes) {
+        for (var i = 0; i < codes.length; i++) if (isValidEan(codes[i].rawValue)) return codes[i].rawValue;
+        return null;
+      }).catch(function () { return null; });
+    }
+    pre.then(function (code) {
+      if (!scanning) return;
+      if (code) { accept(code); return; }
+      return getWorker().then(function (w) {
+        if (!scanning) return;
+        say("Lecture en cours… cadrez les chiffres dans le rectangle.");
+        return w.recognize(grabBand(attempt % 2)).then(function (res) {
+          if (!scanning) return;
+          var found = null, c = candidates(res.data.text || "");
+          for (var i = 0; i < c.length; i++) if (isValidEan(c[i])) { found = c[i]; break; }
+          if (found) {
+            if (found === lastValid) { accept(found); return; }
+            lastValid = found;
+            say("Numéro trouvé, vérification…");
+          } else {
+            say("Cadrez les chiffres dans le rectangle, bien nets.");
+          }
+        });
+      });
+    }).then(function () {
+      if (scanning) setTimeout(loop, 150);
+    }).catch(function (err) {
+      stopScan();
+      setStatus("Le lecteur de chiffres n'a pas pu se charger. Vérifiez la connexion, ou tapez le numéro à la main.", "err");
+    });
+  }
+
+  function startScan() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("La caméra n'est pas disponible ici. Ouvrez le site en https dans Chrome.", "err");
+      return;
+    }
+    setStatus("", "");
+    scanBtn.hidden = true;
+    scanPanel.hidden = false;
+    say("Ouverture de la caméra…");
+    lastValid = null; attempt = 0; startedAt = Date.now();
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false
+    }).then(function (s) {
+      stream = s; scanning = true;
+      video.srcObject = s;
+      return video.play().catch(function () {});
+    }).then(function () {
+      if (!scanning) return;
+      say("Chargement du lecteur de chiffres (quelques secondes la première fois)…");
+      if ("BarcodeDetector" in window && !detector) {
+        try { detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8"] }); } catch (e) { detector = null; }
+      }
+      loop();
+    }).catch(function (err) {
+      stopScan();
+      var denied = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
+      setStatus(denied ? "Accès à la caméra refusé. Autorisez-la pour ce site dans les réglages de Chrome." : "Impossible d'ouvrir la caméra.", "err");
+    });
+  }
+
+  scanBtn.addEventListener("click", startScan);
+  stopBtn.addEventListener("click", function () { stopScan(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && scanning) stopScan(); });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  }
+
+  renderRecent(load());
+  update(false);
+})();
+</script>
+</body>
+</html>
