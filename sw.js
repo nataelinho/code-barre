@@ -1,6 +1,6 @@
 // Service worker : fait fonctionner l'appli hors connexion une fois chargée.
 // Pour forcer une mise à jour chez tout le monde, changer le numéro de version.
-var CACHE = "code-barre-v1";
+var CACHE = "code-barre-v2";
 var SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function (e) {

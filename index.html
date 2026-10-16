@@ -81,6 +81,7 @@
     border: 3px solid #ffffff; border-radius: 8px;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
   }
+  .guide.bars { top: 28%; height: 44%; }
   .scan-msg { margin: 0; font-size: 0.95rem; color: var(--muted); min-height: 1.4em; }
   .scan-actions { display: flex; gap: 8px; }
   .scan-actions button { flex: 1; }
@@ -104,10 +105,11 @@
 
   <section class="scan">
     <button id="scanBtn" class="primary big" type="button">Scanner les chiffres</button>
+    <button id="barsBtn" class="big" type="button">Code abîmé : reconstituer les barres</button>
     <div id="scanPanel" hidden>
       <div class="viewfinder">
         <video id="video" playsinline muted autoplay></video>
-        <div class="guide"></div>
+        <div id="guide" class="guide"></div>
       </div>
       <p id="scanMsg" class="scan-msg" role="status" aria-live="polite"></p>
       <div class="scan-actions">
@@ -212,6 +214,155 @@
       '<rect width="' + width + '" height="74" fill="#fff"/>' + parts.join("") + text.join("") + '</svg>';
   }
 
+  /* ---------- Reconstitution d'un code-barre abîmé ----------
+     Les barres sont verticales : une barre arrachée en bas reste visible en haut.
+     On regarde donc chaque colonne de la photo sur toute la hauteur et on garde
+     « il y a une barre ici » dès qu'elle apparaît sur une partie de la hauteur. */
+  /* DECODER-START */
+  function rotateGray(src, w, h, deg) {
+    if (!deg) return src;
+    var rad = deg * Math.PI / 180, c = Math.cos(rad), s = Math.sin(rad);
+    var cx = (w - 1) / 2, cy = (h - 1) / 2;
+    var out = new Uint8Array(w * h);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        var dx = x - cx, dy = y - cy;
+        var sx = c * dx + s * dy + cx, sy = -s * dx + c * dy + cy;
+        var x0 = Math.floor(sx), y0 = Math.floor(sy);
+        if (x0 < 0 || y0 < 0 || x0 >= w - 1 || y0 >= h - 1) { out[y * w + x] = 255; continue; }
+        var fx = sx - x0, fy = sy - y0, i = y0 * w + x0;
+        out[y * w + x] = src[i] * (1 - fx) * (1 - fy) + src[i + 1] * fx * (1 - fy) + src[i + w] * (1 - fx) * fy + src[i + w + 1] * fx * fy;
+      }
+    }
+    return out;
+  }
+
+  // Pour chaque colonne : une valeur très sombre (10e centile) sur toute la hauteur utile.
+  function columnProfile(data, w, h, pct) {
+    var r0 = Math.floor(h * 0.08), r1 = Math.ceil(h * 0.92), n = r1 - r0;
+    var k = Math.max(0, Math.min(n - 1, Math.floor(n * pct)));
+    var prof = new Float32Array(w), col = new Uint8Array(n);
+    for (var x = 0; x < w; x++) {
+      for (var y = 0; y < n; y++) col[y] = data[(r0 + y) * w + x];
+      col.sort();
+      prof[x] = col[k];
+    }
+    return prof;
+  }
+
+  function darkMask(prof) {
+    var sorted = Array.prototype.slice.call(prof).sort(function (a, b) { return a - b; });
+    var lo = sorted[Math.floor(sorted.length * 0.05)], hi = sorted[Math.floor(sorted.length * 0.95)];
+    if (hi - lo < 30) return null;
+    var thr = (lo + hi) / 2, m = new Uint8Array(prof.length), x;
+    for (x = 0; x < prof.length; x++) m[x] = prof[x] < thr ? 1 : 0;
+    // retire les petits parasites (moins de 2 pixels de large)
+    x = 0;
+    while (x < m.length) {
+      if (m[x]) {
+        var e = x;
+        while (e + 1 < m.length && m[e + 1]) e++;
+        if (e - x + 1 < 2) for (var q = x; q <= e; q++) m[q] = 0;
+        x = e + 1;
+      } else x++;
+    }
+    return m;
+  }
+
+  function maskExtent(m) {
+    var a = -1, b = -1;
+    for (var x = 0; x < m.length; x++) if (m[x]) { if (a < 0) a = x; b = x; }
+    return a < 0 ? null : { x: a, w: b - a + 1 };
+  }
+
+  function bitsFrom(mask, x0, W, n) {
+    var mw = W / n, out = [];
+    for (var i = 0; i < n; i++) {
+      var a = Math.round(x0 + i * mw + mw * 0.2), b = Math.round(x0 + (i + 1) * mw - mw * 0.2);
+      if (b <= a) b = a + 1;
+      var cnt = 0;
+      for (var x = a; x < b; x++) cnt += (x >= 0 && x < mask.length) ? mask[x] : 0;
+      out.push(cnt * 2 > (b - a) ? 1 : 0);
+    }
+    return out.join("");
+  }
+
+  function bestGroup(str, tables) {
+    var bd = 9, bc = [];
+    tables.forEach(function (t) {
+      for (var d = 0; d < 10; d++) {
+        var dist = 0;
+        for (var k = 0; k < 7; k++) if (str.charAt(k) !== t.arr[d].charAt(k)) dist++;
+        if (dist < bd) { bd = dist; bc = [{ d: d, n: t.name }]; }
+        else if (dist === bd) bc.push({ d: d, n: t.name });
+      }
+    });
+    return (bd > 1 || bc.length !== 1) ? null : bc[0];
+  }
+
+  function decodeBits(s, n) {
+    var i, g, left = "", right = "", parity = "";
+    if (n === 95) {
+      if (s.substr(0, 3) !== "101" || s.substr(45, 5) !== "01010" || s.substr(92, 3) !== "101") return null;
+      for (i = 0; i < 6; i++) {
+        g = bestGroup(s.substr(3 + 7 * i, 7), [{ name: "L", arr: L }, { name: "G", arr: G }]);
+        if (!g) return null;
+        left += g.d; parity += g.n;
+      }
+      for (i = 0; i < 6; i++) {
+        g = bestGroup(s.substr(50 + 7 * i, 7), [{ name: "R", arr: R }]);
+        if (!g) return null;
+        right += g.d;
+      }
+      var first = PARITY.indexOf(parity);
+      if (first < 0) return null;
+      var code13 = first + left + right;
+      return isValidEan(code13) ? code13 : null;
+    }
+    if (s.substr(0, 3) !== "101" || s.substr(31, 5) !== "01010" || s.substr(64, 3) !== "101") return null;
+    for (i = 0; i < 4; i++) {
+      g = bestGroup(s.substr(3 + 7 * i, 7), [{ name: "L", arr: L }]);
+      if (!g) return null;
+      left += g.d;
+    }
+    for (i = 0; i < 4; i++) {
+      g = bestGroup(s.substr(36 + 7 * i, 7), [{ name: "R", arr: R }]);
+      if (!g) return null;
+      right += g.d;
+    }
+    var code8 = left + right;
+    return isValidEan(code8) ? code8 : null;
+  }
+
+  function reverseStr(s) { return s.split("").reverse().join(""); }
+
+  // gray : niveaux de gris (0 = noir) de la zone cadrée, w x h pixels.
+  function reconstructBarcode(gray, w, h) {
+    var angles = [0], a;
+    for (a = 1; a <= 12; a++) angles.push(a, -a);
+    var dxs = [0, -1, 1, -2, 2], dws = [0, -1, 1, -2, 2, -3, 3, -4, 4];
+    for (var ai = 0; ai < angles.length; ai++) {
+      var rot = rotateGray(gray, w, h, angles[ai]);
+      var mask = darkMask(columnProfile(rot, w, h, 0.10));
+      if (!mask) continue;
+      var ext = maskExtent(mask);
+      if (!ext) continue;
+      for (var ni = 0; ni < 2; ni++) {
+        var n = ni === 0 ? 95 : 67;
+        if (ext.w < n * 2) continue;
+        for (var xi = 0; xi < dxs.length; xi++) {
+          for (var wi = 0; wi < dws.length; wi++) {
+            var s = bitsFrom(mask, ext.x + dxs[xi], ext.w + dws[wi], n);
+            var res = decodeBits(s, n) || decodeBits(reverseStr(s), n);
+            if (res) return { code: res, angle: angles[ai] };
+          }
+        }
+      }
+    }
+    return null;
+  }
+  /* DECODER-END */
+
   /* ---------- Interface : saisie, statut, affichage ---------- */
   var input = document.getElementById("ean");
   var statusEl = document.getElementById("status");
@@ -299,6 +450,9 @@
 
   /* ---------- Scan des chiffres par la caméra ---------- */
   var scanBtn = document.getElementById("scanBtn");
+  var barsBtn = document.getElementById("barsBtn");
+  var guide = document.getElementById("guide");
+  var mode = "digits";
   var scanPanel = document.getElementById("scanPanel");
   var stopBtn = document.getElementById("stopBtn");
   var video = document.getElementById("video");
@@ -341,15 +495,36 @@
     video.srcObject = null;
     scanPanel.hidden = true;
     scanBtn.hidden = false;
+    barsBtn.hidden = false;
   }
 
   // Zone visible de la vidéo (l'image est recadrée dans le cadre 4:3) puis bande de lecture.
-  function bandRect() {
+  function bandRect(fx, fy, fw, fh) {
+    if (fx === undefined) { fx = 0.04; fy = 0.35; fw = 0.92; fh = 0.30; }
     var vw = video.videoWidth, vh = video.videoHeight;
     var ba = 4 / 3, va = vw / vh, vx, vy, w, h;
     if (va < ba) { w = vw; h = vw / ba; vx = 0; vy = (vh - h) / 2; }
     else { h = vh; w = vh * ba; vx = (vw - w) / 2; vy = 0; }
-    return { vx: vx, vy: vy, vw: w, vh: h, x: vx + 0.04 * w, y: vy + 0.35 * h, w: 0.92 * w, h: 0.30 * h };
+    return { vx: vx, vy: vy, vw: w, vh: h, x: vx + fx * w, y: vy + fy * h, w: fw * w, h: fh * h };
+  }
+
+  // Étape « code abîmé » : recadre la zone des barres et tente la reconstitution.
+  function barsStep() {
+    var r = bandRect(0.04, 0.28, 0.92, 0.44);
+    var outW = 640, outH = Math.round(outW * r.h / r.w);
+    work.width = outW; work.height = outH;
+    var ctx = work.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, outW, outH);
+    var d = ctx.getImageData(0, 0, outW, outH).data, gray = new Uint8Array(outW * outH);
+    for (var i = 0; i < gray.length; i++) gray[i] = (d[4 * i] * 299 + d[4 * i + 1] * 587 + d[4 * i + 2] * 114) / 1000;
+    var res = reconstructBarcode(gray, outW, outH);
+    if (res) {
+      if (res.code === lastValid) { accept(res.code); return; }
+      lastValid = res.code;
+      say("Code reconstitué, vérification…");
+    } else {
+      say("Placez les barres (sans les chiffres) dans le rectangle, bien droites et nettes.");
+    }
   }
 
   function grabBand(variant) {
@@ -415,6 +590,7 @@
     pre.then(function (code) {
       if (!scanning) return;
       if (code) { accept(code); return; }
+      if (mode === "bars") { barsStep(); return; }
       return getWorker().then(function (w) {
         if (!scanning) return;
         say("Lecture en cours… cadrez les chiffres dans le rectangle.");
@@ -439,13 +615,16 @@
     });
   }
 
-  function startScan() {
+  function startScan(m) {
+    mode = m === "bars" ? "bars" : "digits";
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setStatus("La caméra n'est pas disponible ici. Ouvrez le site en https dans Chrome.", "err");
       return;
     }
     setStatus("", "");
     scanBtn.hidden = true;
+    barsBtn.hidden = true;
+    guide.className = "guide" + (mode === "bars" ? " bars" : "");
     scanPanel.hidden = false;
     say("Ouverture de la caméra…");
     lastValid = null; attempt = 0; startedAt = Date.now();
@@ -458,7 +637,7 @@
       return video.play().catch(function () {});
     }).then(function () {
       if (!scanning) return;
-      say("Chargement du lecteur de chiffres (quelques secondes la première fois)…");
+      say(mode === "bars" ? "Placez les barres (sans les chiffres) dans le rectangle, bien droites et nettes." : "Chargement du lecteur de chiffres (quelques secondes la première fois)…");
       if ("BarcodeDetector" in window && !detector) {
         try { detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8"] }); } catch (e) { detector = null; }
       }
@@ -470,7 +649,8 @@
     });
   }
 
-  scanBtn.addEventListener("click", startScan);
+  scanBtn.addEventListener("click", function () { startScan("digits"); });
+  barsBtn.addEventListener("click", function () { startScan("bars"); });
   stopBtn.addEventListener("click", function () { stopScan(); });
   document.addEventListener("visibilitychange", function () { if (document.hidden && scanning) stopScan(); });
 
