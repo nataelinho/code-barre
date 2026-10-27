@@ -4,35 +4,31 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Code-barre Caisse</title>
-<meta name="theme-color" content="#0b6b5c">
+<meta name="theme-color" content="#0a1630">
+<meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
-  /* Une colonne de caisse : scan, saisie, puis le code-barre sur fond blanc. */
+  /* Thème sombre bleu nuit avec rouge pour l'action principale. Le code-barre reste noir sur blanc : un lecteur ne lit que des barres sombres sur fond clair. */
   :root {
-    color-scheme: light;
-    --bg: #f3f5f4;
-    --surface: #ffffff;
-    --fg: #14211e;
-    --muted: #5b6b66;
-    --line: #d5dcd9;
-    --accent: #0b6b5c;
-    --accent-fg: #ffffff;
-    --err: #b3261e;
-    --ok: #1d7a46;
+    color-scheme: dark;
+    --bg: #0a1630;
+    --bar: #0f2250;
+    --surface: #13285a;
+    --surface-2: #1a3370;
+    --line: #2c4a8c;
+    --fg: #f3f7ff;
+    --muted: #a3b6dc;
+    --blue: #5b9cf5;
+    --red: #e4002b;
+    --red-fg: #ffffff;
+    --ok: #6fe0a8;
+    --err: #ff9d96;
     --font-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --bg: #101513; --surface: #1a211f; --fg: #e6edea; --muted: #97a6a0; --line: #2f3a37;
-      --accent: #4cc9b0; --accent-fg: #07201a; --err: #ff9a8f; --ok: #6fd69a;
-    }
-  }
-
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   body {
@@ -41,56 +37,79 @@
     font-family: var(--font-body);
     font-size: 16px;
     line-height: 1.45;
-    padding-top: max(16px, env(safe-area-inset-top, 0px));
     padding-bottom: max(28px, env(safe-area-inset-bottom, 0px));
+  }
+  .top {
+    background: var(--bar);
+    border-bottom: 3px solid var(--red);
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-  main { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
-  h1 { font-size: 1.3rem; font-weight: 700; margin: 0; }
+  .top-in { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 1.25rem; font-weight: 700; margin: 0 0 10px; letter-spacing: 0.01em; }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    flex: 1; min-height: 48px; padding: 0 12px; border: 0; border-radius: 10px 10px 0 0;
+    background: transparent; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer;
+    border-bottom: 4px solid transparent;
+  }
+  .tab[aria-selected="true"] { background: var(--bg); color: var(--fg); border-bottom-color: var(--red); }
+  main {
+    max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;
+    padding: 16px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  }
 
-  label.cap { display: block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  label.cap, .cap { display: block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
   .field { display: flex; gap: 8px; }
   input[type="text"] {
     flex: 1; min-width: 0;
-    font-family: var(--font-mono); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.06em;
-    padding: 12px 14px; border-radius: 8px; border: 2px solid var(--line);
+    font-family: var(--font-mono); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.05em;
+    padding: 12px 14px; border-radius: 10px; border: 2px solid var(--line);
     background: var(--surface); color: var(--fg);
   }
-  input[type="text"]:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  input[type="text"]::placeholder { color: var(--muted); opacity: 0.6; font-weight: 500; }
+  input[type="text"]:focus-visible, button:focus-visible, .tab:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
   button {
     font: inherit; font-weight: 700; cursor: pointer;
-    padding: 0 16px; min-height: 52px; border-radius: 8px;
+    padding: 0 16px; min-height: 52px; border-radius: 10px;
     border: 2px solid var(--line); background: var(--surface); color: var(--fg);
   }
-  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-  button.big { width: 100%; min-height: 60px; font-size: 1.15rem; }
+  button.primary { background: var(--red); color: var(--red-fg); border-color: var(--red); }
+  button.big { width: 100%; min-height: 64px; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  button.big svg { width: 26px; height: 26px; flex: none; }
   button:disabled { opacity: 0.55; cursor: default; }
+
+  .formats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .formats button { min-height: 36px; padding: 0 12px; font-size: 0.85rem; font-weight: 600; border-radius: 18px; }
+  .formats button[aria-pressed="true"] { background: var(--blue); color: #06142c; border-color: var(--blue); }
 
   .status { min-height: 1.5em; margin: 8px 0 0; font-size: 0.95rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .status.err { color: var(--err); }
   .status.ok { color: var(--ok); }
   .status button { min-height: 36px; padding: 0 12px; font-size: 0.9rem; }
 
-  /* Zone de scan */
-  .scan { display: flex; flex-direction: column; gap: 10px; }
-  .viewfinder { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 10px; overflow: hidden; }
+  /* Scanner */
+  .viewfinder { position: relative; width: 100%; aspect-ratio: 4 / 3; background: #000; border-radius: 12px; overflow: hidden; }
   .viewfinder video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .guide {
-    position: absolute; left: 4%; width: 92%; top: 35%; height: 30%;
-    border: 3px solid #ffffff; border-radius: 8px;
-    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    position: absolute; left: 6%; width: 88%; top: 18%; height: 62%;
+    border: 3px solid #ffffff; border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(4, 10, 24, 0.55);
   }
-  .guide.bars { top: 28%; height: 44%; }
-  .scan-msg { margin: 0; font-size: 0.95rem; color: var(--muted); min-height: 1.4em; }
-  .scan-actions { display: flex; gap: 8px; }
-  .scan-actions button { flex: 1; }
+  .guide::after { content: ""; position: absolute; left: 0; right: 0; top: 70%; border-top: 2px dashed rgba(255, 255, 255, 0.7); }
+  .guide span { position: absolute; left: 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px #000; }
+  .guide .z1 { top: 6px; }
+  .guide .z2 { bottom: 6px; }
+  .scan-msg { margin: 10px 0 0; font-size: 0.95rem; color: var(--muted); min-height: 1.4em; }
+  .scan-actions { margin-top: 8px; }
+  .scan-actions button { width: 100%; }
 
-  /* Le code-barre reste noir sur blanc dans les deux thèmes : un lecteur ne lit que des barres sombres sur fond clair. */
-  .ticket { background: #ffffff; color: #000000; border-radius: 8px; border: 1px solid var(--line); padding: 14px 10px 10px; }
+  .ticket { background: #ffffff; color: #000000; border-radius: 10px; border: 1px solid var(--line); padding: 14px 10px 10px; }
   .ticket svg { display: block; width: 100%; height: auto; max-width: 100%; }
+  .ticket.qr svg { max-width: 300px; margin: 0 auto; }
   .ticket .empty { margin: 0; padding: 40px 12px; text-align: center; color: #555; font-size: 0.95rem; }
-  .ticket-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 0.8rem; color: #444; font-family: var(--font-mono); }
+  .ticket-foot { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 0.8rem; color: #444; font-family: var(--font-mono); overflow-wrap: anywhere; }
 
   .tip { color: var(--muted); font-size: 0.9rem; margin: 0; }
   .recent h2 { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
@@ -100,50 +119,69 @@
 </style>
 </head>
 <body>
-<main>
-  <h1>Code-barre Caisse</h1>
+<header class="top">
+  <div class="top-in">
+    <h1>Code-barre Caisse</h1>
+    <div class="tabs" role="tablist" aria-label="Type de code">
+      <button class="tab" id="tab-art" role="tab" aria-selected="true" aria-controls="pane-art" type="button">Articles</button>
+      <button class="tab" id="tab-loy" role="tab" aria-selected="false" aria-controls="pane-loy" type="button">Carte fidélité</button>
+    </div>
+  </div>
+</header>
 
-  <section class="scan">
-    <button id="scanBtn" class="primary big" type="button">Scanner les chiffres</button>
-    <button id="barsBtn" class="big" type="button">Code abîmé : reconstituer les barres</button>
+<main>
+  <section aria-label="Scanner">
+    <button id="scanBtn" class="primary big" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8v8M11 8v8M14 8v8M17 8v8" stroke-width="1.8"/></svg>
+      <span>Scanner</span>
+    </button>
     <div id="scanPanel" hidden>
       <div class="viewfinder">
         <video id="video" playsinline muted autoplay></video>
-        <div id="guide" class="guide"></div>
+        <div id="guide" class="guide"><span class="z1">Barres</span><span class="z2">Chiffres</span></div>
       </div>
       <p id="scanMsg" class="scan-msg" role="status" aria-live="polite"></p>
-      <div class="scan-actions">
-        <button id="stopBtn" type="button">Arrêter</button>
-      </div>
+      <div class="scan-actions"><button id="stopBtn" type="button">Arrêter</button></div>
     </div>
   </section>
 
-  <section>
-    <label class="cap" for="ean">Numéro EAN (13 chiffres, ou 8)</label>
+  <section id="pane-art" role="tabpanel" aria-labelledby="tab-art" data-pane="art">
+    <label class="cap" for="in-art">Numéro du code</label>
     <div class="field">
-      <input id="ean" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="20" aria-describedby="status">
-      <button id="clear" type="button" aria-label="Effacer le numéro">Effacer</button>
+      <input id="in-art" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="120" placeholder="3017620422003" aria-describedby="st-art">
+      <button type="button" data-clear="art" aria-label="Effacer">Effacer</button>
     </div>
-    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <div class="formats" data-formats="art" role="group" aria-label="Format du code"></div>
+    <p id="st-art" class="status" role="status" aria-live="polite"></p>
+    <div class="ticket" id="tk-art" aria-label="Code-barre"></div>
+    <section class="recent" id="recent" hidden style="margin-top:16px">
+      <h2>Derniers codes</h2>
+      <div class="chips" id="chips"></div>
+    </section>
   </section>
 
-  <section aria-label="Code-barre">
-    <div class="ticket" id="ticket"></div>
+  <section id="pane-loy" role="tabpanel" aria-labelledby="tab-loy" data-pane="loy" hidden>
+    <label class="cap" for="in-loy">Numéro de la carte</label>
+    <div class="field">
+      <input id="in-loy" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="120" placeholder="Numéro sous le code-barre" aria-describedby="st-loy">
+      <button type="button" data-clear="loy" aria-label="Effacer">Effacer</button>
+    </div>
+    <div class="formats" data-formats="loy" role="group" aria-label="Format du code"></div>
+    <p id="st-loy" class="status" role="status" aria-live="polite"></p>
+    <div class="ticket" id="tk-loy" aria-label="Code de la carte"></div>
+    <p class="tip" style="margin-top:12px">Les numéros de carte ne sont pas enregistrés sur ce téléphone. Scannez une carte pour la reproduire dans le même format que l'original ; si le format est inconnu, essayez Code 128, puis EAN ou QR.</p>
   </section>
 
-  <p class="tip">Dernier chiffre manquant ? Tapez seulement les 12 premiers, il est calculé tout seul. Pour scanner depuis l'écran : luminosité au maximum, et une douchette à caméra (les lasers ne lisent pas les écrans).</p>
-
-  <section class="recent" id="recent" hidden>
-    <h2>Derniers codes</h2>
-    <div class="chips" id="chips"></div>
-  </section>
+  <p class="tip" id="tipArt">Dernier chiffre manquant ? Tapez seulement les 12 premiers, il est calculé tout seul. Pour passer devant la scannette : luminosité au maximum, et une scannette à caméra (les lasers ne lisent pas les écrans).</p>
 </main>
 
+<script src="vendor/jsbarcode.min.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script>
 (function () {
   "use strict";
 
-  /* ---------- Encodage EAN-13 / EAN-8 ---------- */
+  /* ---------- Encodage EAN-13 / EAN-8 (dessin maison) ---------- */
   var L = ["0001101","0011001","0010011","0111101","0100011","0110001","0101111","0111011","0110111","0001011"];
   var G = ["0100111","0110011","0011011","0100001","0011101","0111001","0000101","0010001","0001001","0010111"];
   var R = ["1110010","1100110","1101100","1000010","1011100","1001110","1010000","1000100","1001000","1110100"];
@@ -158,7 +196,10 @@
     return (10 - (s % 10)) % 10;
   }
   function isValidEan(code) {
-    return (code.length === 13 || code.length === 8) && checkDigit(code.slice(0, -1)) === +code.charAt(code.length - 1);
+    return /^\d+$/.test(code) && (code.length === 13 || code.length === 8) && checkDigit(code.slice(0, -1)) === +code.charAt(code.length - 1);
+  }
+  function isValidUpcA(code) {
+    return /^\d{12}$/.test(code) && checkDigit(code.slice(0, -1)) === +code.charAt(11);
   }
 
   function encode(code) {
@@ -214,7 +255,7 @@
       '<rect width="' + width + '" height="74" fill="#fff"/>' + parts.join("") + text.join("") + '</svg>';
   }
 
-  /* ---------- Reconstitution d'un code-barre abîmé ----------
+  /* ---------- Reconstitution d'un code-barre EAN abîmé ----------
      Les barres sont verticales : une barre arrachée en bas reste visible en haut.
      On regarde donc chaque colonne de la photo sur toute la hauteur et on garde
      « il y a une barre ici » dès qu'elle apparaît sur une partie de la hauteur. */
@@ -363,62 +404,183 @@
   }
   /* DECODER-END */
 
-  /* ---------- Interface : saisie, statut, affichage ---------- */
-  var input = document.getElementById("ean");
-  var statusEl = document.getElementById("status");
-  var ticket = document.getElementById("ticket");
+  /* ---------- Formats : noms, dessin, validation ---------- */
+  var LABELS = { ean13: "EAN-13", ean8: "EAN-8", upca: "UPC-A", code128: "Code 128", code39: "Code 39", itf: "ITF", qr: "QR code" };
+  var CHIPS = [
+    ["auto", "Auto"], ["ean", "EAN"], ["upca", "UPC-A"], ["code128", "Code 128"],
+    ["code39", "Code 39"], ["itf", "ITF"], ["qr", "QR"]
+  ];
+  var NUMERIC_CHIPS = { auto: 1, ean: 1, upca: 1, itf: 1 };
+
+  function drawLinear(fmt, text) {
+    var jsFmt = { upca: "UPC", code128: "CODE128", code39: "CODE39", itf: "ITF" }[fmt];
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    var ok = true;
+    JsBarcode(svg, text, {
+      format: jsFmt, width: 2, height: 90, displayValue: true, fontSize: 18, font: "monospace",
+      textMargin: 4, margin: 12, background: "#ffffff", lineColor: "#000000",
+      valid: function (v) { ok = v; }
+    });
+    if (!ok) return null;
+    var w = parseFloat(svg.getAttribute("width")), h = parseFloat(svg.getAttribute("height"));
+    if (!w || !h) return null;
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svg.removeAttribute("width"); svg.removeAttribute("height");
+    svg.removeAttribute("style");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Code-barre " + text);
+    return svg.outerHTML;
+  }
+
+  function drawQr(text) {
+    try { if (qrcode.stringToBytesFuncs && qrcode.stringToBytesFuncs["UTF-8"]) qrcode.stringToBytes = qrcode.stringToBytesFuncs["UTF-8"]; } catch (e) {}
+    var q = qrcode(0, "M");
+    q.addData(text);
+    q.make();
+    var n = q.getModuleCount(), m = 4, size = n + 2 * m, d = "";
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += "M" + (c + m) + " " + (r + m) + "h1v1h-1z";
+    return '<svg viewBox="0 0 ' + size + ' ' + size + '" role="img" aria-label="QR code" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">' +
+      '<rect width="' + size + '" height="' + size + '" fill="#fff"/><path d="' + d + '" fill="#000"/></svg>';
+  }
+
+  /* Décide du format et valide le texte.
+     strict = onglet Articles : en Auto, un numéro de 13/8 chiffres doit être un EAN valide.
+     Sinon (carte fidélité), un numéro qui n'est pas un EAN valide est simplement encodé en Code 128. */
+  function resolve(raw, choice, strict) {
+    var t = raw.trim();
+    if (!t) return { kind: "empty" };
+    var digits = /^\d+$/.test(t), fmt = choice, len = t.length;
+
+    if (fmt === "auto") {
+      if (digits && (len === 13 || len === 8) && isValidEan(t)) fmt = "ean";
+      else if (digits && strict && (len === 12 || len === 7 || len === 13 || len === 8)) fmt = "ean";
+      else if (digits && strict) {
+        return { kind: "partial", msg: len < 13
+          ? len + " chiffre" + (len > 1 ? "s" : "") + ". Il en faut 13 (ou 8 pour un petit format). Autre format : choisissez-le ci-dessous."
+          : "Plus de 13 chiffres : choisissez le format ci-dessous (Code 128, ITF…)." };
+      }
+      else if (/^https?:\/\//i.test(t) || len > 60) fmt = "qr";
+      else fmt = "code128";
+    }
+
+    if (fmt === "ean") {
+      if (!digits) return { kind: "error", msg: "Un EAN ne contient que des chiffres." };
+      if (len === 12 || len === 7) {
+        var full = t + checkDigit(t);
+        return { kind: "ok", fmt: full.length === 13 ? "ean13" : "ean8", text: full, msg: "Dernier chiffre calculé : " + full.charAt(full.length - 1), tone: "ok" };
+      }
+      if (len === 13 || len === 8) {
+        var exp = checkDigit(t.slice(0, -1));
+        if (exp !== +t.charAt(len - 1)) return { kind: "error", msg: "Un chiffre est faux : le dernier devrait être " + exp + ".", fix: t.slice(0, -1) + exp };
+        return { kind: "ok", fmt: len === 13 ? "ean13" : "ean8", text: t, msg: "Numéro valide.", tone: "ok" };
+      }
+      return { kind: "partial", msg: len + " chiffre" + (len > 1 ? "s" : "") + ". Un EAN en compte 13, ou 8 pour un petit format." };
+    }
+    if (fmt === "upca") {
+      if (!digits) return { kind: "error", msg: "Un UPC-A ne contient que des chiffres." };
+      if (len === 11) { var f12 = t + checkDigit(t); return { kind: "ok", fmt: "upca", text: f12, msg: "Dernier chiffre calculé : " + f12.charAt(11), tone: "ok" }; }
+      if (len === 12) {
+        if (!isValidUpcA(t)) { var e2 = checkDigit(t.slice(0, -1)); return { kind: "error", msg: "Un chiffre est faux : le dernier devrait être " + e2 + ".", fix: t.slice(0, -1) + e2 }; }
+        return { kind: "ok", fmt: "upca", text: t, msg: "Numéro valide.", tone: "ok" };
+      }
+      return { kind: "partial", msg: len + " chiffre" + (len > 1 ? "s" : "") + ". Un UPC-A en compte 12." };
+    }
+    if (fmt === "itf") {
+      if (!digits) return { kind: "error", msg: "L'ITF ne contient que des chiffres." };
+      if (len % 2) return { kind: "partial", msg: "L'ITF demande un nombre pair de chiffres (" + len + " pour l'instant)." };
+      return { kind: "ok", fmt: "itf", text: t, msg: "Prêt.", tone: "ok" };
+    }
+    if (fmt === "code39") {
+      var u = t.toUpperCase();
+      if (!/^[0-9A-Z\-. $\/+%]+$/.test(u)) return { kind: "error", msg: "Code 39 : lettres, chiffres et - . $ / + % seulement." };
+      return { kind: "ok", fmt: "code39", text: u, msg: "Prêt.", tone: "ok" };
+    }
+    if (fmt === "qr") return { kind: "ok", fmt: "qr", text: t, msg: "Prêt.", tone: "ok" };
+    // code128
+    if (!/^[\x20-\x7e]+$/.test(t)) return { kind: "error", msg: "Code 128 : caractères simples seulement (sans accents)." };
+    var note = (choice === "auto" && !strict && digits && (len === 13 || len === 8)) ? "Pas un EAN valide : encodé en Code 128." : "Prêt.";
+    return { kind: "ok", fmt: "code128", text: t, msg: note, tone: "ok" };
+  }
+
+  function drawCode(res) {
+    try {
+      if (res.fmt === "ean13" || res.fmt === "ean8") return svgFor(res.text);
+      if (res.fmt === "qr") return drawQr(res.text);
+      return drawLinear(res.fmt, res.text);
+    } catch (e) { return null; }
+  }
+
+  /* ---------- Onglets : Articles / Carte fidélité ---------- */
+  function makeTab(key, strict, save) {
+    return {
+      key: key, strict: strict, save: save, choice: "auto",
+      input: document.getElementById("in-" + key),
+      status: document.getElementById("st-" + key),
+      ticket: document.getElementById("tk-" + key),
+      formats: document.querySelector('[data-formats="' + key + '"]'),
+      pane: document.getElementById("pane-" + key),
+      tabBtn: document.getElementById("tab-" + key),
+      timer: null
+    };
+  }
+  var tabs = { art: makeTab("art", true, true), loy: makeTab("loy", false, false) };
+  var active = "art";
+  var KEY = "codes-recents";
   var recentBox = document.getElementById("recent");
   var chips = document.getElementById("chips");
-  var KEY = "codes-recents";
+  var tipArt = document.getElementById("tipArt");
 
-  function setStatus(msg, kind, fixedCode) {
-    statusEl.className = "status" + (kind ? " " + kind : "");
-    statusEl.textContent = msg;
-    if (fixedCode) {
+  function setStatus(t, msg, kind, fixText) {
+    t.status.className = "status" + (kind ? " " + kind : "");
+    t.status.textContent = msg;
+    if (fixText) {
       var b = document.createElement("button");
       b.type = "button";
-      b.textContent = "Corriger en " + fixedCode;
-      b.addEventListener("click", function () { input.value = fixedCode; update(true); });
-      statusEl.appendChild(b);
+      b.textContent = "Corriger en " + fixText;
+      b.addEventListener("click", function () { t.input.value = fixText; update(t, true); });
+      t.status.appendChild(b);
     }
   }
-  function showEmpty(msg) { ticket.innerHTML = '<p class="empty">' + msg + '</p>'; }
+  function showEmpty(t, msg) { t.ticket.className = "ticket"; t.ticket.innerHTML = '<p class="empty">' + msg + '</p>'; }
 
-  function draw(code, save) {
-    ticket.innerHTML = svgFor(code) +
-      '<div class="ticket-foot"><span>' + (code.length === 13 ? "EAN-13" : "EAN-8") + '</span><span>' + code + '</span></div>';
-    if (save) remember(code);
+  function renderFormats(t) {
+    t.formats.innerHTML = "";
+    CHIPS.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = c[1]; b.setAttribute("data-f", c[0]);
+      b.setAttribute("aria-pressed", t.choice === c[0] ? "true" : "false");
+      b.addEventListener("click", function () { setChoice(t, c[0]); update(t, false); });
+      t.formats.appendChild(b);
+    });
+  }
+  function setChoice(t, c) {
+    t.choice = c;
+    t.input.setAttribute("inputmode", NUMERIC_CHIPS[c] ? "numeric" : "text");
+    Array.prototype.forEach.call(t.formats.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-f") === c ? "true" : "false"); });
   }
 
-  function update(save) {
-    var digits = input.value.replace(/\D/g, "");
-    if (digits !== input.value) input.value = digits;
-    var len = digits.length;
-    if (len === 0) { setStatus("", ""); showEmpty("Le code-barre apparaît ici."); return; }
-    if (len === 12 || len === 7) {
-      var full = digits + checkDigit(digits);
-      setStatus("Dernier chiffre calculé : " + full.charAt(full.length - 1), "ok");
-      draw(full, save); return;
+  function update(t, save) {
+    if (NUMERIC_CHIPS[t.choice]) {
+      var only = t.input.value.replace(/\D/g, "");
+      if (only !== t.input.value) t.input.value = only;
     }
-    if (len === 13 || len === 8) {
-      var expected = checkDigit(digits.slice(0, -1));
-      if (expected !== +digits.charAt(len - 1)) {
-        setStatus("Un chiffre est faux : le dernier devrait être " + expected + ".", "err", digits.slice(0, -1) + expected);
-        showEmpty("Vérifiez le numéro, un chiffre ne correspond pas.");
-        return;
-      }
-      setStatus("Numéro valide.", "ok");
-      draw(digits, save); return;
-    }
-    if (len > 13) { setStatus("Trop de chiffres : un EAN en compte 13 ou 8.", "err"); showEmpty("Trop de chiffres."); return; }
-    setStatus(len + " chiffre" + (len > 1 ? "s" : "") + ". Il en faut 13, ou 8 pour un petit format.", "");
-    showEmpty("Le code-barre apparaît ici.");
+    var res = resolve(t.input.value, t.choice, t.strict);
+    if (res.kind === "empty") { setStatus(t, "", ""); showEmpty(t, "Le code-barre apparaît ici."); return; }
+    if (res.kind === "partial") { setStatus(t, res.msg, ""); showEmpty(t, "Le code-barre apparaît ici."); return; }
+    if (res.kind === "error") { setStatus(t, res.msg, "err", res.fix); showEmpty(t, "Vérifiez le numéro."); return; }
+    var svg = drawCode(res);
+    if (!svg) { setStatus(t, "Ce texte ne peut pas être encodé dans ce format.", "err"); showEmpty(t, "Changez de format ou vérifiez le texte."); return; }
+    setStatus(t, res.msg, res.tone);
+    t.ticket.className = "ticket" + (res.fmt === "qr" ? " qr" : "");
+    t.ticket.innerHTML = svg + '<div class="ticket-foot"><span>' + LABELS[res.fmt] + '</span><span></span></div>';
+    t.ticket.querySelector(".ticket-foot span:last-child").textContent = res.text.length > 40 ? res.text.slice(0, 40) + "…" : res.text;
+    if (save && t.save) remember(res.text, t.choice === "auto" ? "auto" : t.choice);
   }
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
-  function remember(code) {
-    var list = load().filter(function (c) { return c !== code; });
-    list.unshift(code);
+  function remember(text, f) {
+    var list = load().filter(function (c) { return c && c.t !== text; });
+    list.unshift({ t: text, f: f });
     list = list.slice(0, 8);
     try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {}
     renderRecent(list);
@@ -428,144 +590,183 @@
     if (!list.length) { recentBox.hidden = true; return; }
     recentBox.hidden = false;
     list.forEach(function (c) {
+      if (!c || typeof c.t !== "string") return;
       var b = document.createElement("button");
-      b.type = "button"; b.textContent = c;
-      b.addEventListener("click", function () { input.value = c; update(false); window.scrollTo(0, 0); });
+      b.type = "button"; b.textContent = c.t.length > 22 ? c.t.slice(0, 22) + "…" : c.t;
+      b.addEventListener("click", function () {
+        var t = tabs.art;
+        setChoice(t, c.f || "auto");
+        t.input.value = c.t; update(t, false); window.scrollTo(0, 0);
+      });
       chips.appendChild(b);
     });
   }
 
-  var timer = null;
-  input.addEventListener("input", function () {
-    update(false);
-    clearTimeout(timer);
-    timer = setTimeout(function () {
-      var d = input.value.replace(/\D/g, "");
-      if (d.length === 13 || d.length === 8 || d.length === 12 || d.length === 7) update(true);
-    }, 1200);
-  });
-  document.getElementById("clear").addEventListener("click", function () {
-    input.value = ""; update(false); input.focus();
+  Object.keys(tabs).forEach(function (k) {
+    var t = tabs[k];
+    renderFormats(t);
+    t.input.addEventListener("input", function () {
+      update(t, false);
+      clearTimeout(t.timer);
+      t.timer = setTimeout(function () { update(t, true); }, 1200);
+    });
+    t.pane.querySelector("[data-clear]").addEventListener("click", function () {
+      t.input.value = ""; update(t, false); t.input.focus();
+    });
+    t.tabBtn.addEventListener("click", function () { selectTab(k); });
   });
 
-  /* ---------- Scan des chiffres par la caméra ---------- */
+  function selectTab(k) {
+    if (scanning) stopScan();
+    active = k;
+    Object.keys(tabs).forEach(function (n) {
+      var on = n === k;
+      tabs[n].pane.hidden = !on;
+      tabs[n].tabBtn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    tipArt.hidden = k !== "art";
+    try { localStorage.setItem("onglet", k); } catch (e) {}
+  }
+
+  /* ---------- Scan unique : tout est tenté sur chaque image ----------
+     1. lecture directe de tous les formats (numéros, QR, codes 1D/2D)
+     2. reconstitution d'un EAN abîmé (barres en haut du cadre)
+     3. lecture des chiffres imprimés (en bas du cadre) */
   var scanBtn = document.getElementById("scanBtn");
-  var barsBtn = document.getElementById("barsBtn");
-  var guide = document.getElementById("guide");
-  var mode = "digits";
   var scanPanel = document.getElementById("scanPanel");
   var stopBtn = document.getElementById("stopBtn");
   var video = document.getElementById("video");
   var scanMsg = document.getElementById("scanMsg");
   var TESS_SRC = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
 
-  var stream = null, scanning = false, worker = null, tessLoading = null, detector = null;
-  var lastValid = null, attempt = 0, startedAt = 0;
+  var stream = null, scanning = false, attempt = 0, startedAt = 0, lastValid = null;
+  var nativeDet = null, zx = null, zxTried = false, ocrState = 0, ocrWorker = null;
   var work = document.createElement("canvas");
 
-  function loadTesseract() {
-    if (window.Tesseract) return Promise.resolve();
-    if (tessLoading) return tessLoading;
-    tessLoading = new Promise(function (resolve, reject) {
-      var s = document.createElement("script");
-      s.src = TESS_SRC;
-      s.onload = resolve;
-      s.onerror = function () { tessLoading = null; reject(new Error("tesseract")); };
-      document.head.appendChild(s);
-    });
-    return tessLoading;
-  }
+  var FMT = { ean_13: "ean13", ean_8: "ean8", upc_a: "upca", upc_e: "upce", code_128: "code128", code_39: "code39", code_93: "code93",
+    itf: "itf", codabar: "codabar", qr_code: "qr", data_matrix: "datamatrix", pdf417: "pdf417", pdf_417: "pdf417", aztec: "aztec" };
+  function normFmt(f) { return FMT[String(f).toLowerCase()] || "other"; }
+  var FMT_NAMES = { codabar: "Codabar", upce: "UPC-E", code93: "Code 93", datamatrix: "DataMatrix", pdf417: "PDF417", aztec: "Aztec", other: "inconnu" };
 
-  function getWorker() {
-    if (worker) return Promise.resolve(worker);
-    return loadTesseract().then(function () {
-      return window.Tesseract.createWorker("eng");
-    }).then(function (w) {
-      return w.setParameters({ tessedit_char_whitelist: "0123456789 ", tessedit_pageseg_mode: "7" }).then(function () {
-        worker = w; return w;
-      });
-    });
+  function plausible(text, fmt) {
+    if (!text) return false;
+    if (fmt === "ean13" || fmt === "ean8") return isValidEan(text);
+    if (fmt === "upca") return isValidUpcA(text) || isValidEan("0" + text);
+    if (fmt === "itf") return /^\d+$/.test(text);
+    return true;
   }
 
   function say(msg) { scanMsg.textContent = msg; }
 
-  function stopScan() {
-    scanning = false;
-    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
-    video.srcObject = null;
-    scanPanel.hidden = true;
-    scanBtn.hidden = false;
-    barsBtn.hidden = false;
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.src = src; s.onload = resolve; s.onerror = function () { reject(new Error("load " + src)); };
+      document.head.appendChild(s);
+    });
   }
 
-  // Zone visible de la vidéo (l'image est recadrée dans le cadre 4:3) puis bande de lecture.
-  function bandRect(fx, fy, fw, fh) {
-    if (fx === undefined) { fx = 0.04; fy = 0.35; fw = 0.92; fh = 0.30; }
+  function initDetectors() {
+    if (nativeDet || zx || zxTried) return Promise.resolve();
+    var p = Promise.resolve();
+    if ("BarcodeDetector" in window) {
+      p = window.BarcodeDetector.getSupportedFormats().then(function (list) {
+        var f = list.filter(function (x) { return x !== "unknown"; });
+        if (f.length) nativeDet = new window.BarcodeDetector({ formats: f });
+      }).catch(function () {});
+    }
+    return p.then(function () {
+      if (nativeDet) return;
+      zxTried = true;
+      return loadScript("vendor/zxing.min.js").then(function () {
+        var Z = window.ZXing, hints = new Map();
+        hints.set(Z.DecodeHintType.TRY_HARDER, true);
+        var B = Z.BarcodeFormat;
+        hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, [B.EAN_13, B.EAN_8, B.UPC_A, B.UPC_E, B.CODE_128, B.CODE_39, B.CODE_93, B.ITF, B.CODABAR, B.QR_CODE, B.DATA_MATRIX, B.PDF_417, B.AZTEC]);
+        var reader = new Z.MultiFormatReader();
+        reader.setHints(hints);
+        zx = { Z: Z, reader: reader };
+      }).catch(function () {});
+    });
+  }
+
+  function videoRect(fx, fy, fw, fh) {
     var vw = video.videoWidth, vh = video.videoHeight;
     var ba = 4 / 3, va = vw / vh, vx, vy, w, h;
     if (va < ba) { w = vw; h = vw / ba; vx = 0; vy = (vh - h) / 2; }
     else { h = vh; w = vh * ba; vx = (vw - w) / 2; vy = 0; }
-    return { vx: vx, vy: vy, vw: w, vh: h, x: vx + fx * w, y: vy + fy * h, w: fw * w, h: fh * h };
+    return { x: vx + fx * w, y: vy + fy * h, w: fw * w, h: fh * h };
   }
-
-  // Étape « code abîmé » : recadre la zone des barres et tente la reconstitution.
-  function barsStep() {
-    var r = bandRect(0.04, 0.28, 0.92, 0.44);
-    var outW = 640, outH = Math.round(outW * r.h / r.w);
+  function grabGray(r, outW) {
+    var outH = Math.max(8, Math.round(outW * r.h / r.w));
     work.width = outW; work.height = outH;
     var ctx = work.getContext("2d", { willReadFrequently: true });
     ctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, outW, outH);
-    var d = ctx.getImageData(0, 0, outW, outH).data, gray = new Uint8Array(outW * outH);
+    var d = ctx.getImageData(0, 0, outW, outH).data, gray = new Uint8ClampedArray(outW * outH);
     for (var i = 0; i < gray.length; i++) gray[i] = (d[4 * i] * 299 + d[4 * i + 1] * 587 + d[4 * i + 2] * 114) / 1000;
-    var res = reconstructBarcode(gray, outW, outH);
-    if (res) {
-      if (res.code === lastValid) { accept(res.code); return; }
-      lastValid = res.code;
-      say("Code reconstitué, vérification…");
-    } else {
-      say("Placez les barres (sans les chiffres) dans le rectangle, bien droites et nettes.");
-    }
+    return { gray: gray, w: outW, h: outH };
   }
 
-  function grabBand(variant) {
-    var r = bandRect();
-    var outW = 1100, outH = Math.round(outW * r.h / r.w);
-    work.width = outW; work.height = outH;
-    var ctx = work.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, outW, outH);
-    var img = ctx.getImageData(0, 0, outW, outH), d = img.data, n = outW * outH;
-    var hist = new Array(256).fill(0), i;
-    for (i = 0; i < n; i++) {
-      var g = (d[4 * i] * 299 + d[4 * i + 1] * 587 + d[4 * i + 2] * 114) / 1000 | 0;
-      d[4 * i] = g; hist[g]++;
+  function pickValid(list) {
+    for (var i = 0; i < list.length; i++) if (plausible(list[i].text, list[i].fmt)) return list[i];
+    return null;
+  }
+
+  function detectDirect() {
+    if (nativeDet) {
+      return nativeDet.detect(video).then(function (codes) {
+        return pickValid(codes.map(function (c) { return { text: c.rawValue, fmt: normFmt(c.format) }; }));
+      }).catch(function () { return null; });
     }
-    var lo = 0, hi = 255, acc = 0;
+    if (zx) {
+      try {
+        var g = grabGray(videoRect(0, 0, 1, 1), 960);
+        var src = new zx.Z.RGBLuminanceSource(g.gray, g.w, g.h);
+        var res = zx.reader.decode(new zx.Z.BinaryBitmap(new zx.Z.HybridBinarizer(src)));
+        var name = zx.Z.BarcodeFormat[res.getBarcodeFormat()];
+        return Promise.resolve(pickValid([{ text: res.getText(), fmt: normFmt(name) }]));
+      } catch (e) { return Promise.resolve(null); }
+    }
+    return Promise.resolve(null);
+  }
+
+  function reconstructStep() {
+    var g = grabGray(videoRect(0.06, 0.18, 0.88, 0.62 * 0.70), 640);
+    var res = reconstructBarcode(g.gray, g.w, g.h);
+    return res ? res.code : null;
+  }
+
+  function enhance(gray, w, h, binarize) {
+    var hist = new Array(256).fill(0), n = w * h, i, lo = 0, hi = 255, acc = 0;
+    for (i = 0; i < n; i++) hist[gray[i]]++;
     for (i = 0; i < 256; i++) { acc += hist[i]; if (acc > n * 0.02) { lo = i; break; } }
     acc = 0;
     for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc > n * 0.02) { hi = i; break; } }
-    if (hi - lo < 20) { hi = lo + 20; }
+    if (hi - lo < 20) hi = lo + 20;
+    var ctx = work.getContext("2d"), img = ctx.createImageData(w, h);
     for (i = 0; i < n; i++) {
-      var v = (d[4 * i] - lo) * 255 / (hi - lo);
+      var v = (gray[i] - lo) * 255 / (hi - lo);
       v = v < 0 ? 0 : v > 255 ? 255 : v;
-      if (variant === 1) v = v > 128 ? 255 : 0;
-      d[4 * i] = d[4 * i + 1] = d[4 * i + 2] = v; d[4 * i + 3] = 255;
+      if (binarize) v = v > 128 ? 255 : 0;
+      img.data[4 * i] = img.data[4 * i + 1] = img.data[4 * i + 2] = v; img.data[4 * i + 3] = 255;
     }
-    ctx.putImageData(img, 0, 0);
+    work.width = w; work.height = h;
+    work.getContext("2d").putImageData(img, 0, 0);
     return work;
   }
 
-  function accept(code) {
-    stopScan();
-    input.value = code;
-    update(true);
-    try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
-    window.scrollTo(0, 0);
+  function preloadOcr() {
+    if (ocrState !== 0) return;
+    ocrState = 1;
+    var p = window.Tesseract ? Promise.resolve() : loadScript(TESS_SRC);
+    p.then(function () { return window.Tesseract.createWorker("eng"); }).then(function (w) {
+      return w.setParameters({ tessedit_char_whitelist: "0123456789 ", tessedit_pageseg_mode: "7" }).then(function () { ocrWorker = w; ocrState = 2; });
+    }).catch(function () { ocrState = -1; });
   }
 
   function candidates(text) {
     var out = [];
-    var lines = text.split(/\n+/);
-    lines.forEach(function (line) {
+    text.split(/\n+/).forEach(function (line) {
       var d = line.replace(/\D/g, "");
       if (d.length === 13 || d.length === 8) out.push(d);
     });
@@ -574,57 +775,82 @@
     return out;
   }
 
-  function loop() {
-    if (!scanning) return;
-    if (Date.now() - startedAt > 90000) { stopScan(); setStatus("Pas de numéro lu. Rapprochez-vous, ajoutez de la lumière ou tapez-le à la main.", "err"); return; }
-    if (!video.videoWidth) { setTimeout(loop, 200); return; }
-    attempt++;
-
-    var pre = Promise.resolve(null);
-    if (detector) {
-      pre = detector.detect(video).then(function (codes) {
-        for (var i = 0; i < codes.length; i++) if (isValidEan(codes[i].rawValue)) return codes[i].rawValue;
-        return null;
-      }).catch(function () { return null; });
-    }
-    pre.then(function (code) {
-      if (!scanning) return;
-      if (code) { accept(code); return; }
-      if (mode === "bars") { barsStep(); return; }
-      return getWorker().then(function (w) {
-        if (!scanning) return;
-        say("Lecture en cours… cadrez les chiffres dans le rectangle.");
-        return w.recognize(grabBand(attempt % 2)).then(function (res) {
-          if (!scanning) return;
-          var found = null, c = candidates(res.data.text || "");
-          for (var i = 0; i < c.length; i++) if (isValidEan(c[i])) { found = c[i]; break; }
-          if (found) {
-            if (found === lastValid) { accept(found); return; }
-            lastValid = found;
-            say("Numéro trouvé, vérification…");
-          } else {
-            say("Cadrez les chiffres dans le rectangle, bien nets.");
-          }
-        });
-      });
-    }).then(function () {
-      if (scanning) setTimeout(loop, 150);
-    }).catch(function (err) {
-      stopScan();
-      setStatus("Le lecteur de chiffres n'a pas pu se charger. Vérifiez la connexion, ou tapez le numéro à la main.", "err");
+  function ocrStep() {
+    var g = grabGray(videoRect(0.06, 0.18 + 0.62 * 0.70, 0.88, 0.62 * 0.30), 1100);
+    var cv = enhance(g.gray, g.w, g.h, (attempt / 3 | 0) % 2 === 1);
+    return ocrWorker.recognize(cv).then(function (res) {
+      var c = candidates(res.data.text || "");
+      for (var i = 0; i < c.length; i++) if (isValidEan(c[i])) return c[i];
+      return null;
     });
   }
 
-  function startScan(m) {
-    mode = m === "bars" ? "bars" : "digits";
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setStatus("La caméra n'est pas disponible ici. Ouvrez le site en https dans Chrome.", "err");
+  function stopScan() {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+    video.srcObject = null;
+    scanPanel.hidden = true;
+    scanBtn.hidden = false;
+  }
+
+  function chipFor(fmt) { return fmt === "ean13" || fmt === "ean8" ? "ean" : fmt; }
+
+  function accept(text, fmt, how) {
+    stopScan();
+    var t = tabs[active];
+    if (fmt === "upca" && text.length === 13 && text.charAt(0) === "0") text = text.slice(1);
+    var supported = !!LABELS[fmt], prefix;
+    if (supported) prefix = (how || "") + "Lu en " + LABELS[fmt] + ". ";
+    else {
+      prefix = "Format " + (FMT_NAMES[fmt] || fmt) + " non pris en charge ici : contenu recopié et reproduit en Code 128 (la caisse peut le refuser). ";
+      fmt = "code128";
+    }
+    setChoice(t, chipFor(fmt));
+    t.input.value = text;
+    update(t, true);
+    var bad = !supported || /err/.test(t.status.className);
+    setStatus(t, prefix + t.status.textContent, bad ? "err" : "ok");
+    try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {}
+    window.scrollTo(0, 0);
+  }
+
+  function confirmed(code, how) {
+    if (code === lastValid) { accept(code, code.length === 13 ? "ean13" : "ean8", how); return true; }
+    lastValid = code;
+    say("Numéro trouvé, vérification…");
+    return false;
+  }
+
+  function loop() {
+    if (!scanning) return;
+    if (Date.now() - startedAt > 90000) {
+      stopScan();
+      setStatus(tabs[active], "Rien de lu. Rapprochez-vous, ajoutez de la lumière, ou tapez le numéro.", "err");
       return;
     }
-    setStatus("", "");
+    if (!video.videoWidth) { setTimeout(loop, 200); return; }
+    attempt++;
+    detectDirect().then(function (hit) {
+      if (!scanning) return;
+      if (hit) { accept(hit.text, hit.fmt, ""); return; }
+      var code = null;
+      if (attempt % 2 === 0) { try { code = reconstructStep(); } catch (e) {} }
+      if (code) { if (confirmed(code, "Code abîmé reconstitué. ")) return; return; }
+      if (ocrState === 2 && attempt % 3 === 0) {
+        return ocrStep().then(function (c) { if (c && scanning) confirmed(c, "Chiffres lus. "); });
+      }
+    }).catch(function () {}).then(function () {
+      if (scanning) setTimeout(loop, 120);
+    });
+  }
+
+  function startScan() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus(tabs[active], "La caméra n'est pas disponible ici. Ouvrez le site en https dans Chrome.", "err");
+      return;
+    }
+    setStatus(tabs[active], "", "");
     scanBtn.hidden = true;
-    barsBtn.hidden = true;
-    guide.className = "guide" + (mode === "bars" ? " bars" : "");
     scanPanel.hidden = false;
     say("Ouverture de la caméra…");
     lastValid = null; attempt = 0; startedAt = Date.now();
@@ -637,20 +863,19 @@
       return video.play().catch(function () {});
     }).then(function () {
       if (!scanning) return;
-      say(mode === "bars" ? "Placez les barres (sans les chiffres) dans le rectangle, bien droites et nettes." : "Chargement du lecteur de chiffres (quelques secondes la première fois)…");
-      if ("BarcodeDetector" in window && !detector) {
-        try { detector = new window.BarcodeDetector({ formats: ["ean_13", "ean_8"] }); } catch (e) { detector = null; }
-      }
-      loop();
+      say("Cadrez le code : barres en haut du rectangle, chiffres en bas.");
+      preloadOcr();
+      return initDetectors();
+    }).then(function () {
+      if (scanning) loop();
     }).catch(function (err) {
       stopScan();
       var denied = err && (err.name === "NotAllowedError" || err.name === "SecurityError");
-      setStatus(denied ? "Accès à la caméra refusé. Autorisez-la pour ce site dans les réglages de Chrome." : "Impossible d'ouvrir la caméra.", "err");
+      setStatus(tabs[active], denied ? "Accès à la caméra refusé. Autorisez-la pour ce site dans les réglages de Chrome." : "Impossible d'ouvrir la caméra.", "err");
     });
   }
 
-  scanBtn.addEventListener("click", function () { startScan("digits"); });
-  barsBtn.addEventListener("click", function () { startScan("bars"); });
+  scanBtn.addEventListener("click", startScan);
   stopBtn.addEventListener("click", function () { stopScan(); });
   document.addEventListener("visibilitychange", function () { if (document.hidden && scanning) stopScan(); });
 
@@ -658,8 +883,15 @@
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
   }
 
+  /* Pour les tests automatiques */
+  window.__codebarre = { resolve: resolve, drawCode: drawCode, isValidEan: isValidEan };
+
+  var saved = null;
+  try { saved = localStorage.getItem("onglet"); } catch (e) {}
+  selectTab(saved === "loy" ? "loy" : "art");
   renderRecent(load());
-  update(false);
+  update(tabs.art, false);
+  update(tabs.loy, false);
 })();
 </script>
 </body>
