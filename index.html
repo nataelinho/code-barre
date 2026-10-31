@@ -202,6 +202,7 @@
   </section>
 
   <p class="tip" id="tipArt">Dernier chiffre manquant ? Tapez seulement les 12 premiers, il est calculé tout seul. Pour passer devant la scannette : luminosité au maximum, et une scannette à caméra (les lasers ne lisent pas les écrans).</p>
+  <p class="tip" style="opacity:.6;font-size:.8rem">Version 6</p>
 </main>
 
 <script src="vendor/jsbarcode.min.js"></script>
@@ -694,11 +695,12 @@
   function resolve(raw, choice, strict) {
     var t = raw.trim();
     if (!t) return { kind: "empty" };
-    var digits = /^\d+$/.test(t), fmt = choice, len = t.length;
+    var digits = /^\d+$/.test(t), fmt = choice, len = t.length, autoNote = "";
 
     if (fmt === "auto") {
       if (digits && (len === 13 || len === 8) && isValidEan(t)) fmt = "ean";
       else if (digits && strict && (len === 12 || len === 7 || len === 13 || len === 8)) fmt = "ean";
+      else if (digits && strict && len > 13) { fmt = "code128"; autoNote = "Plus de 13 chiffres : dessiné en Code 128 (numéro de carte). Autre format : choisissez-le ci-dessous."; }
       else if (digits && strict) {
         return { kind: "partial", msg: len < 13
           ? len + " chiffre" + (len > 1 ? "s" : "") + ". Il en faut 13 (ou 8 pour un petit format). Autre format : choisissez-le ci-dessous."
@@ -743,7 +745,7 @@
     if (fmt === "qr") return { kind: "ok", fmt: "qr", text: t, msg: "Prêt.", tone: "ok" };
     // code128
     if (!/^[\x20-\x7e]+$/.test(t)) return { kind: "error", msg: "Code 128 : caractères simples seulement (sans accents)." };
-    var note = (choice === "auto" && !strict && digits && (len === 13 || len === 8)) ? "Pas un EAN valide : encodé en Code 128." : "Prêt.";
+    var note = autoNote || ((choice === "auto" && !strict && digits && (len === 13 || len === 8)) ? "Pas un EAN valide : encodé en Code 128." : "Prêt.");
     return { kind: "ok", fmt: "code128", text: t, msg: note, tone: "ok" };
   }
 
