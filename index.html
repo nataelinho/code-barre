@@ -417,6 +417,8 @@
       if (!mask) continue;
       var ext = maskExtent(mask);
       if (!ext) continue;
+      var t128 = reconstruct128(mask);
+      if (t128) return { code: t128, fmt: "code128", angle: angles[ai] };
       for (var ni = 0; ni < 2; ni++) {
         var n = ni === 0 ? 95 : 67;
         if (ext.w < n * 2) continue;
@@ -424,12 +426,226 @@
           for (var wi = 0; wi < dws.length; wi++) {
             var s = bitsFrom(mask, ext.x + dxs[xi], ext.w + dws[wi], n);
             var res = decodeBits(s, n) || decodeBits(reverseStr(s), n);
-            if (res) return { code: res, angle: angles[ai] };
+            if (res) return { code: res, fmt: res.length === 13 ? "ean13" : "ean8", angle: angles[ai] };
           }
         }
       }
     }
     return null;
+  }
+  /* CODE128-START */
+  // Reconstitution d'un Code 128 abîmé (carte fidélité, étiquette) : mêmes colonnes « barre présente » que pour l'EAN.
+  var C128 = [
+    "11011001100", "11001101100", "11001100110", "10010011000", "10010001100", "10001001100",
+    "10011001000", "10011000100", "10001100100", "11001001000", "11001000100", "11000100100",
+    "10110011100", "10011011100", "10011001110", "10111001100", "10011101100", "10011100110",
+    "11001110010", "11001011100", "11001001110", "11011100100", "11001110100", "11101101110",
+    "11101001100", "11100101100", "11100100110", "11101100100", "11100110100", "11100110010",
+    "11011011000", "11011000110", "11000110110", "10100011000", "10001011000", "10001000110",
+    "10110001000", "10001101000", "10001100010", "11010001000", "11000101000", "11000100010",
+    "10110111000", "10110001110", "10001101110", "10111011000", "10111000110", "10001110110",
+    "11101110110", "11010001110", "11000101110", "11011101000", "11011100010", "11011101110",
+    "11101011000", "11101000110", "11100010110", "11101101000", "11101100010", "11100011010",
+    "11101111010", "11001000010", "11110001010", "10100110000", "10100001100", "10010110000",
+    "10010000110", "10000101100", "10000100110", "10110010000", "10110000100", "10011010000",
+    "10011000010", "10000110100", "10000110010", "11000010010", "11001010000", "11110111010",
+    "11000010100", "10001111010", "10100111100", "10010111100", "10010011110", "10111100100",
+    "10011110100", "10011110010", "11110100100", "11110010100", "11110010010", "11011011110",
+    "11011110110", "11110110110", "10101111000", "10100011110", "10001011110", "10111101000",
+    "10111100010", "11110101000", "11110100010", "10111011110", "10111101110", "11101011110",
+    "11110101110", "11010000100", "11010010000", "11010011100", "1100011101011"  ];
+  var C128_INDEX = {};
+  C128.forEach(function (b, v) { if (v < 106) C128_INDEX[b] = v; });
+  var C128_STARTS = [C128[103], C128[104], C128[105]];
+
+  // bits : suite de modules 0/1 depuis la première barre du départ jusqu'à la dernière barre de l'arrêt.
+  function decode128(bits) {
+    var n = bits.length;
+    if (n < 11 * 3 + 13 || (n - 13) % 11 !== 0) return null;
+    if (bits.slice(n - 13) !== C128[106]) return null;
+    var N = (n - 13) / 11, vals = [], i, v;
+    for (i = 0; i < N; i++) {
+      v = C128_INDEX[bits.substr(11 * i, 11)];
+      if (v === undefined) return null;
+      vals.push(v);
+    }
+    var start = vals[0];
+    if (start < 103 || start > 105) return null;
+    var sum = start;
+    for (i = 1; i < N - 1; i++) {
+      sum += i * vals[i];
+    }
+    if (sum % 103 !== vals[N - 1]) return null;
+    var set = start === 103 ? "A" : start === 104 ? "B" : "C", text = "";
+    for (i = 1; i < N - 1; i++) {
+      v = vals[i];
+      if (set === "C") {
+        if (v <= 99) text += (v < 10 ? "0" : "") + v;
+        else if (v === 100) set = "B";
+        else if (v === 101) set = "A";
+        else return null;
+      } else if (set === "B") {
+        if (v <= 94) text += String.fromCharCode(32 + v);
+        else if (v === 99) set = "C";
+        else if (v === 101) set = "A";
+        else return null;
+      } else {
+        if (v <= 63) text += String.fromCharCode(32 + v);
+        else if (v === 99) set = "C";
+        else if (v === 100) set = "B";
+        else return null;
+      }
+    }
+    return text.length ? text : null;
+  }
+
+  function reconstruct128(mask) {
+    var ext = maskExtent(mask);
+    if (!ext) return null;
+    var dxs = [0, -1, 1], dws = [0, -1, 1, -2, 2];
+    for (var N = 3; N <= 45; N++) {
+      var M = 11 * N + 13;
+      if (ext.w / M < 1.5) break;
+      for (var xi = 0; xi < dxs.length; xi++) {
+        for (var wi = 0; wi < dws.length; wi++) {
+          var s = bitsFrom(mask, ext.x + dxs[xi], ext.w + dws[wi], M);
+          var f = s.slice(0, 11), l = reverseStr(s.slice(M - 11));
+          var res = null;
+          if (C128_STARTS.indexOf(f) >= 0) res = decode128(s);
+          if (!res && C128_STARTS.indexOf(l) >= 0) res = decode128(reverseStr(s));
+          if (res) return res;
+        }
+      }
+    }
+    return null;
+  }
+  /* CODE128-END */
+
+  /* LOCATE-START */
+  // Repère le code-barre dans l'image (zone riche en traits verticaux), le recadre,
+  // l'agrandit et l'entoure de blanc. Utile pour un code affiché sur un écran sombre :
+  // la marge blanche autour du code y est souvent trop mince pour un lecteur logiciel.
+  function resizeGray(src, w, h, nw, nh) {
+    var out = new Uint8ClampedArray(nw * nh), sx = w / nw, sy = h / nh;
+    for (var y = 0; y < nh; y++) {
+      var fy = (y + 0.5) * sy - 0.5, y0 = Math.max(0, Math.min(h - 2, Math.floor(fy))), ty = Math.min(1, Math.max(0, fy - y0));
+      for (var x = 0; x < nw; x++) {
+        var fx = (x + 0.5) * sx - 0.5, x0 = Math.max(0, Math.min(w - 2, Math.floor(fx))), tx = Math.min(1, Math.max(0, fx - x0));
+        var i = y0 * w + x0;
+        out[y * nw + x] = src[i] * (1 - tx) * (1 - ty) + src[i + 1] * tx * (1 - ty) + src[i + w] * (1 - tx) * ty + src[i + w + 1] * tx * ty;
+      }
+    }
+    return out;
+  }
+
+  function locateCode(gray, w, h) {
+    var B = 12, bw = Math.floor(w / B), bh = Math.floor(h / B);
+    if (bw < 4 || bh < 4) return null;
+    var en = new Float32Array(bw * bh), mx = 0, bx, by, x, y;
+    for (by = 0; by < bh; by++) {
+      for (bx = 0; bx < bw; bx++) {
+        var sh = 0, sv = 0;
+        for (y = by * B; y < by * B + B - 1; y++) {
+          var r = y * w;
+          for (x = bx * B; x < bx * B + B - 1; x++) {
+            var g = gray[r + x];
+            sh += Math.abs(gray[r + x + 1] - g);
+            sv += Math.abs(gray[r + w + x] - g);
+          }
+        }
+        var e = Math.max(0, sh - 1.2 * sv);
+        en[by * bw + bx] = e;
+        if (e > mx) mx = e;
+      }
+    }
+    if (mx < B * B * 12) return null;
+    // Bande horizontale la plus riche en traits verticaux, puis étendue gauche-droite de cette bande.
+    var rowE = new Float32Array(bh), maxR = 0, argR = 0;
+    for (by = 0; by < bh; by++) {
+      for (bx = 0; bx < bw; bx++) rowE[by] += en[by * bw + bx];
+      if (rowE[by] > maxR) { maxR = rowE[by]; argR = by; }
+    }
+    var y0 = argR, y1 = argR, miss = 0, t;
+    for (t = argR - 1; t >= 0; t--) { if (rowE[t] >= maxR * 0.35) { y0 = t; miss = 0; } else if (++miss > 1) break; }
+    miss = 0;
+    for (t = argR + 1; t < bh; t++) { if (rowE[t] >= maxR * 0.35) { y1 = t; miss = 0; } else if (++miss > 1) break; }
+    var colE = new Float32Array(bw), maxC = 0;
+    for (bx = 0; bx < bw; bx++) {
+      for (by = y0; by <= y1; by++) colE[bx] += en[by * bw + bx];
+      if (colE[bx] > maxC) maxC = colE[bx];
+    }
+    var x0 = -1, x1 = -1;
+    for (bx = 0; bx < bw; bx++) if (colE[bx] >= maxC * 0.2) { if (x0 < 0) x0 = bx; x1 = bx; }
+    if (x0 < 0) return null;
+    var rx = Math.max(0, (x0 - 1) * B), ry = Math.max(0, (y0 - 1) * B);
+    var rx1 = Math.min(w, (x1 + 2) * B), ry1 = Math.min(h, (y1 + 2) * B);
+    return { x: rx, y: ry, w: rx1 - rx, h: ry1 - ry };
+  }
+
+  // Retire le fond sombre autour du cadre blanc du code : ne garde que les colonnes et lignes qui contiennent du blanc.
+  function trimBright(gray, w, rect) {
+    var vals = [], i, j, hist = new Array(256).fill(0), n = 0;
+    for (j = rect.y; j < rect.y + rect.h; j++) for (i = rect.x; i < rect.x + rect.w; i++) { hist[gray[j * w + i] | 0]++; n++; }
+    var acc = 0, level = 255;
+    for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc >= n * 0.05) { level = i; break; } }
+    var thr = level * 0.6, x0 = -1, x1 = -1, y0 = -1, y1 = -1, c;
+    for (i = rect.x; i < rect.x + rect.w; i++) {
+      c = 0;
+      for (j = rect.y; j < rect.y + rect.h; j++) if (gray[j * w + i] > thr) c++;
+      if (c >= 3) { if (x0 < 0) x0 = i; x1 = i; }
+    }
+    if (x0 < 0) return rect;
+    for (j = rect.y; j < rect.y + rect.h; j++) {
+      c = 0;
+      for (i = x0; i <= x1; i++) if (gray[j * w + i] > thr) c++;
+      if (c >= 3) { if (y0 < 0) y0 = j; y1 = j; }
+    }
+    if (y0 < 0) return rect;
+    return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  }
+
+  // Recadre sur le code, agrandit si besoin, entoure de blanc. Renvoie une image prête à décoder.
+  function paddedCrop(gray, w, h, rect, invert) {
+    var cw = rect.w, ch = rect.h, i, j;
+    var crop = new Uint8ClampedArray(cw * ch);
+    for (j = 0; j < ch; j++) for (i = 0; i < cw; i++) {
+      var v = gray[(rect.y + j) * w + rect.x + i];
+      crop[j * cw + i] = invert ? 255 - v : v;
+    }
+    var scale = Math.max(1, Math.min(4, 1100 / cw));
+    var nw = Math.round(cw * scale), nh = Math.round(ch * scale);
+    if (scale > 1.05) { crop = resizeGray(crop, cw, ch, nw, nh); } else { nw = cw; nh = ch; }
+    var P = Math.max(40, Math.round(nw * 0.08)), W2 = nw + 2 * P, H2 = nh + 2 * P;
+    var out = new Uint8ClampedArray(W2 * H2).fill(255);
+    for (j = 0; j < nh; j++) for (i = 0; i < nw; i++) out[(j + P) * W2 + i + P] = crop[j * nw + i];
+    return { gray: out, w: W2, h: H2 };
+  }
+  /* LOCATE-END */
+
+  function otsuThreshold(gray) {
+    var hist = new Array(256).fill(0), n = gray.length, i, sum = 0;
+    for (i = 0; i < n; i++) { hist[gray[i] | 0]++; sum += (gray[i] | 0); }
+    var sumB = 0, wB = 0, best = 0, thr = 128;
+    for (i = 0; i < 256; i++) {
+      wB += hist[i];
+      if (!wB) continue;
+      var wF = n - wB;
+      if (!wF) break;
+      sumB += i * hist[i];
+      var mB = sumB / wB, mF = (sum - sumB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+      if (v > best) { best = v; thr = i; }
+    }
+    return thr;
+  }
+  function binarizeImage(g) {
+    var thr = otsuThreshold(g.gray), out = new Uint8ClampedArray(g.gray.length);
+    for (var i = 0; i < out.length; i++) out[i] = g.gray[i] > thr ? 255 : 0;
+    return { gray: out, w: g.w, h: g.h };
+  }
+  function cropGray(gray, w, rect) {
+    var out = new Uint8ClampedArray(rect.w * rect.h);
+    for (var j = 0; j < rect.h; j++) for (var i = 0; i < rect.w; i++) out[j * rect.w + i] = gray[(rect.y + j) * w + rect.x + i];
+    return { gray: out, w: rect.w, h: rect.h };
   }
   /* DECODER-END */
 
@@ -717,6 +933,7 @@
   var stream = null, scanning = false, attempt = 0, startedAt = 0, lastValid = null;
   var nativeDet = null, zx = null, zxTried = false, ocrState = 0, ocrWorker = null;
   var work = document.createElement("canvas");
+  var work2 = document.createElement("canvas");
 
   var FMT = { ean_13: "ean13", ean_8: "ean8", upc_a: "upca", upc_e: "upce", code_128: "code128", code_39: "code39", code_93: "code93",
     itf: "itf", codabar: "codabar", qr_code: "qr", data_matrix: "datamatrix", pdf417: "pdf417", pdf_417: "pdf417", aztec: "aztec" };
@@ -805,10 +1022,50 @@
     return Promise.resolve(null);
   }
 
+  // Décode une image en niveaux de gris (déjà recadrée) avec le lecteur du téléphone, sinon ZXing.
+  function decodeGrayImage(g) {
+    if (nativeDet) {
+      work2.width = g.w; work2.height = g.h;
+      var ctx = work2.getContext("2d"), img = ctx.createImageData(g.w, g.h);
+      for (var i = 0; i < g.gray.length; i++) { var v = g.gray[i]; img.data[4 * i] = img.data[4 * i + 1] = img.data[4 * i + 2] = v; img.data[4 * i + 3] = 255; }
+      ctx.putImageData(img, 0, 0);
+      return nativeDet.detect(work2).then(function (codes) {
+        return pickValid(codes.map(function (c) { return { text: c.rawValue, fmt: normFmt(c.format) }; }));
+      }).catch(function () { return null; });
+    }
+    if (zx) {
+      try {
+        var src = new zx.Z.RGBLuminanceSource(g.gray, g.w, g.h);
+        var res = zx.reader.decode(new zx.Z.BinaryBitmap(new zx.Z.HybridBinarizer(src)));
+        return Promise.resolve(pickValid([{ text: res.getText(), fmt: normFmt(zx.Z.BarcodeFormat[res.getBarcodeFormat()]) }]));
+      } catch (e) { return Promise.resolve(null); }
+    }
+    return Promise.resolve(null);
+  }
+
+  // Un code affiché sur un écran sombre a souvent un cadre blanc trop mince pour les lecteurs :
+  // on repère le code, on le recadre, on l'entoure de blanc et on le décode (aussi en noir et blanc pur).
+  function locatedStep() {
+    var g = grabGray(videoRect(0, 0, 1, 1), 960);
+    var rect = locateCode(g.gray, g.w, g.h);
+    if (!rect || rect.w < 120 || rect.h < 24) return Promise.resolve(null);
+    var tr = trimBright(g.gray, g.w, rect);
+    var a = paddedCrop(g.gray, g.w, g.h, tr, false);
+    var variants = [a, binarizeImage(a), paddedCrop(g.gray, g.w, g.h, rect, true)];
+    var chain = Promise.resolve(null);
+    variants.forEach(function (v) {
+      chain = chain.then(function (hit) { return hit || decodeGrayImage(v); });
+    });
+    return chain;
+  }
+
+  // Code abîmé : on cherche chaque barre sur toute la hauteur et on reconstruit le code.
   function reconstructStep() {
-    var g = grabGray(videoRect(0.06, 0.18, 0.88, 0.62 * 0.70), 640);
-    var res = reconstructBarcode(g.gray, g.w, g.h);
-    return res ? res.code : null;
+    var g = grabGray(videoRect(0, 0, 1, 1), 800);
+    var rect = locateCode(g.gray, g.w, g.h);
+    var c = rect && rect.w >= 120 && rect.h >= 20 ? cropGray(g.gray, g.w, rect) : grabGray(videoRect(0.06, 0.18, 0.88, 0.62 * 0.70), 640);
+    var res = reconstructBarcode(c.gray, c.w, c.h);
+    return res ? { code: res.code, fmt: res.fmt } : null;
   }
 
   function enhance(gray, w, h, binarize) {
@@ -889,8 +1146,8 @@
     window.scrollTo(0, 0);
   }
 
-  function confirmed(code, how) {
-    if (code === lastValid) { accept(code, code.length === 13 ? "ean13" : "ean8", how); return true; }
+  function confirmed(code, fmt, how) {
+    if (code === lastValid) { accept(code, fmt, how); return true; }
     lastValid = code;
     say("Numéro trouvé, vérification…");
     return false;
@@ -905,14 +1162,21 @@
     }
     if (!video.videoWidth) { setTimeout(loop, 200); return; }
     attempt++;
+    var phase = attempt % 4;
     detectDirect().then(function (hit) {
-      if (!scanning) return;
-      if (hit) { accept(hit.text, hit.fmt, ""); return; }
-      var code = null;
-      if (attempt % 2 === 0) { try { code = reconstructStep(); } catch (e) {} }
-      if (code) { if (confirmed(code, "Code abîmé reconstitué. ")) return; return; }
-      if (ocrState === 2 && attempt % 3 === 0) {
-        return ocrStep().then(function (c) { if (c && scanning) confirmed(c, "Chiffres lus. "); });
+      if (!scanning) return hit;
+      if (hit) { accept(hit.text, hit.fmt, ""); return hit; }
+      if (phase === 1 || phase === 3) {
+        return locatedStep().then(function (h) { if (h && scanning) accept(h.text, h.fmt, "Code recadré. "); return h; });
+      }
+      if (phase === 2) {
+        var r = null;
+        try { r = reconstructStep(); } catch (e) {}
+        if (r) { confirmed(r.code, r.fmt, "Code abîmé reconstitué. "); return r; }
+        return null;
+      }
+      if (ocrState === 2) {
+        return ocrStep().then(function (c) { if (c && scanning) confirmed(c, c.length === 13 ? "ean13" : "ean8", "Chiffres lus. "); return c; });
       }
     }).catch(function () {}).then(function () {
       if (scanning) setTimeout(loop, 120);
